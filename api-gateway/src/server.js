@@ -8,11 +8,13 @@ const { RedisStore } = require("rate-limit-redis");
 const logger = require("./utils/logger");
 const proxy = require("express-http-proxy");
 const errorHandler = require("./middlewares/errorHandler");
+const validateToken = require("./middlewares/authMiddleware");
 
 const app = express();
 const PORT = process.env.PORT;
 const REDIS_URL = process.env.REDIS_URL;
 const IDENTITY_SERVICE_URL = process.env.IDENTITY_SERVICE_URL;
+const POSTS_SERVICE_URL = process.env.POSTS_SERVICE_URL;
 
 const redisClient = new Redis(REDIS_URL);
 
@@ -74,9 +76,29 @@ app.use(
   }),
 );
 
+app.use(
+  "/v1/posts",
+  validateToken,
+  proxy(POSTS_SERVICE_URL, {
+    ...proxyOptions,
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+      proxyReqOpts.headers["content-type"] = "application/json";
+      proxyReqOpts.headers["x-user-id"] = srcReq.user.userId;
+
+      return proxyReqOpts;
+    },
+    userResDecorator: (proxyRes, proxyResData, userReq, userRes) => {
+      logger.info(
+        `Response from Posts Service for ${userReq.method} ${userReq.url}: ${proxyRes.statusCode}`,
+      );
+      return proxyResData;
+    },
+  })
+)
 
 app.listen(PORT, () => {
   logger.info(`API Gateway is running on port ${PORT}`);
   logger.info(`Identity service is running on port ${IDENTITY_SERVICE_URL}`);
+  logger.info(`Post service is running on port ${POSTS_SERVICE_URL}`);
   logger.info(`Redis URL is running on port ${REDIS_URL}`);
 });
