@@ -16,10 +16,10 @@ const uploadFile = async (req, res) => {
       });
     }
 
-    const { originalName, mimeType, buffer } = req.file;
+    const { originalname, mimetype, buffer } = req.file;
     const userId = req.user.userId;
 
-    logger.info(`File details: name=${originalName}, type=${mimeType}`);
+    logger.info(`File details: name=${originalname}, type=${mimetype}`);
     logger.info("Started uploading to cloudinary...");
 
     const uploadResult = await uploadToCloudinary(req.file);
@@ -30,8 +30,8 @@ const uploadFile = async (req, res) => {
 
     const uploadedMedia = new Media({
       publicId: uploadResult.public_id,
-      originalName,
-      mimeType,
+      originalName: originalname,
+      mimeType: mimetype,
       url: uploadResult.secure_url,
       userId,
     });
@@ -64,6 +64,12 @@ const getAllFiles = async (req, res) => {
         message: "Could not find any file for this user.",
       });
     }
+
+    return res.status(200).json({
+      success: true,
+      message: "Files retrieved successfully",
+      data: result,
+    });
   } catch (error) {
     logger.error("Error while fetching all the files", error);
     res.status(500).json({
@@ -90,6 +96,12 @@ const deleteFile = async (req, res) => {
     }
 
     await deleteFromCloudinary(media.publicId);
+    await Media.deleteOne({ _id: mediaId });
+
+    return res.status(200).json({
+      success: true,
+      message: "File deleted successfully",
+    });
   } catch (error) {
     logger.error("Error while deleting the file", error);
     res.status(500).json({

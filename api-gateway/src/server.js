@@ -15,6 +15,7 @@ const PORT = process.env.PORT;
 const REDIS_URL = process.env.REDIS_URL;
 const IDENTITY_SERVICE_URL = process.env.IDENTITY_SERVICE_URL;
 const POSTS_SERVICE_URL = process.env.POSTS_SERVICE_URL;
+const MEDIA_SERVICE_URL = process.env.MEDIA_SERVICE_URL;
 
 const redisClient = new Redis(REDIS_URL);
 
@@ -51,11 +52,13 @@ const proxyOptions = {
   },
   proxyErrorHandler: (err, res, next) => {
     console.log(err);
-    logger.error(`Error occurred while processing proxy request: ${err.message}`);
+    logger.error(
+      `Error occurred while processing proxy request: ${err.message}`,
+    );
     res.status(500).json({
       message: `Internal server error`,
       error: err.message,
-    }); 
+    });
   },
 };
 
@@ -93,12 +96,37 @@ app.use(
       );
       return proxyResData;
     },
-  })
-)
+  }),
+);
+
+app.use(
+  "/v1/media",
+  validateToken,
+  proxy(MEDIA_SERVICE_URL, {
+    ...proxyOptions,
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+      proxyReqOpts.headers["x-user-id"] = srcReq.user.userId;
+      if (!srcReq.headers["content-type"]?.startsWith("multipart/form-data")) {
+        proxyReqOpts.headers["Content-Type"] = "application/json";
+      }
+
+      return proxyReqOpts;
+    },
+    userResDecorator: (proxyRes, proxyResData, userReq, userRes) => {
+      logger.info(
+        `Response received from media service: ${proxyRes.statusCode}`,
+      );
+
+      return proxyResData;
+    },
+    parseReqBody: false,
+  }),
+);
 
 app.listen(PORT, () => {
   logger.info(`API Gateway is running on port ${PORT}`);
   logger.info(`Identity service is running on port ${IDENTITY_SERVICE_URL}`);
   logger.info(`Post service is running on port ${POSTS_SERVICE_URL}`);
+  logger.info(`Post service is running on port ${MEDIA_SERVICE_URL}`);
   logger.info(`Redis URL is running on port ${REDIS_URL}`);
 });
