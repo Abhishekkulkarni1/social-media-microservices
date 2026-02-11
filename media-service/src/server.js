@@ -10,6 +10,8 @@ const { RateLimiterRedis } = require("rate-limiter-flexible");
 const Redis = require("ioredis");
 const { rateLimit } = require("express-rate-limit");
 const { RedisStore } = require("rate-limit-redis");
+const { connectRabbitMQ, consumeEvents } = require("./utils/rabbitmq");
+const { handleDeletedPost } = require("./eventHandlers/mediaEventHandlers");
 
 
 const app = express();
@@ -75,9 +77,22 @@ app.use("/api/media/upload", sensitiveEndpointsLimiter);
 app.use("/api/media", mediaRoutes);
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  logger.info(`Media service is running on port ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await connectRabbitMQ();
+
+    await consumeEvents("post.deleted", handleDeletedPost);
+
+    app.listen(PORT, () => {
+      logger.info(`Media service is running on port ${PORT}`);
+    });
+  } catch (error) {
+    logger.error("Error starting the server: ", error);
+    throw error;
+  }
+}
+
+startServer();
 
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("Unhandled Rejection occured at ", promise, " reason: ", reason);``

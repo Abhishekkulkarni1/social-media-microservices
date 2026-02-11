@@ -10,6 +10,7 @@ const postRoutes = require("./routes/postRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 const logger = require("./utils/logger");
 const { RedisStore } = require("rate-limit-redis");
+const { connectRabbitMQ } = require("./utils/rabbitmq");
 
 
 const app = express();
@@ -85,9 +86,19 @@ app.use(
 
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  logger.info(`Identity service is running on port ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await connectRabbitMQ();
+    app.listen(PORT, () => {
+      logger.info(`Post service is running on port ${PORT}`);
+    });
+  } catch (error) {
+    logger.error("Error starting the server: ", error);
+    throw error;
+  }
+}
+
+startServer();
 
 process.on("unhandledRejection", (reason, promise) => {
   logger.error("Unhandled Rejection occured at ", promise, " reason: ", reason);``

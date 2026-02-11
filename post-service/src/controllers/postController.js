@@ -179,6 +179,12 @@ const deletePost = async (req, res) => {
       });
     }
 
+    await publishEvent("post.deleted", {
+      postId: post._id.toString(),
+      userId: req.user.userId,
+      mediaIds: post. ,
+    });
+
     await invalidatePostCache(req, req.params.id);
     return res.status(200).json({
       message: "Post deleted successfully",
