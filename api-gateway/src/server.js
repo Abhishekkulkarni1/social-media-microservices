@@ -16,7 +16,7 @@ const REDIS_URL = process.env.REDIS_URL;
 const IDENTITY_SERVICE_URL = process.env.IDENTITY_SERVICE_URL;
 const POSTS_SERVICE_URL = process.env.POSTS_SERVICE_URL;
 const MEDIA_SERVICE_URL = process.env.MEDIA_SERVICE_URL;
-
+const SEARCH_SERVICE_URL = process.env.SEARCH_SERVICE_URL;
 const redisClient = new Redis(REDIS_URL);
 
 app.use(helmet());
@@ -123,10 +123,32 @@ app.use(
   }),
 );
 
+app.use(
+  "/v1/search",
+  validateToken,
+  proxy(SEARCH_SERVICE_URL, {
+    ...proxyOptions,
+    proxyReqOptDecorator: (proxyReqOpts, srcReq) => {
+      proxyReqOpts.headers["Content-Type"] = "application/json";
+      proxyReqOpts.headers["x-user-id"] = srcReq.user.userId;
+
+      return proxyReqOpts;
+    },
+    userResDecorator: (proxyRes, proxyResData, userReq, userRes) => {
+      logger.info(
+        `Response received from Search service: ${proxyRes.statusCode}`
+      );
+
+      return proxyResData;
+    },
+  })
+);
+
 app.listen(PORT, () => {
   logger.info(`API Gateway is running on port ${PORT}`);
   logger.info(`Identity service is running on port ${IDENTITY_SERVICE_URL}`);
   logger.info(`Post service is running on port ${POSTS_SERVICE_URL}`);
   logger.info(`Post service is running on port ${MEDIA_SERVICE_URL}`);
+  logger.info(`Search service is running on port ${SEARCH_SERVICE_URL}`);
   logger.info(`Redis URL is running on port ${REDIS_URL}`);
 });

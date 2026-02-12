@@ -1,6 +1,7 @@
 const logger = require("../utils/logger");
 const Post = require("../models/Posts");
 const validateCreatePost = require("../utils/validation");
+const { publishToQueue } = require("../utils/rabbitmq");
 
 const createPost = async (req, res) => {
   logger.info("Creating a new post");
@@ -22,6 +23,14 @@ const createPost = async (req, res) => {
     })
 
     await newPost.save();
+    
+    await publishToQueue("post.created", {
+      postId: newPost._id.toString(),
+      userId: newPost.user.toString(),
+      content: newPost.content,
+      createdAt: newPost.createdAt,
+    });
+
     await invalidatePostCache(req, newPost._id.toString());
     logger.info("New post created succesfully");
     return res.status(201).json({
@@ -179,10 +188,10 @@ const deletePost = async (req, res) => {
       });
     }
 
-    await publishEvent("post.deleted", {
+    await publishToQueue("post.deleted", {
       postId: post._id.toString(),
       userId: req.user.userId,
-      mediaIds: post. ,
+      mediaIds: post.mediaIds,
     });
 
     await invalidatePostCache(req, req.params.id);
